@@ -54,7 +54,7 @@ class Hunyuan3DPaintPipeline:
     @classmethod
     def from_pretrained(cls, model_path, subfolder='hunyuan3d-paint-v2-0-turbo'):
         original_model_path = model_path
-        if not os.path.exists(model_path):
+        if os.path.exists(model_path):
             # try local path
             base_dir = os.environ.get('HY3DGEN_MODELS', '~/.cache/hy3dgen')
             model_path = os.path.expanduser(os.path.join(base_dir, model_path))
