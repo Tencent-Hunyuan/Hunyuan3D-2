@@ -568,7 +568,7 @@ class HunyuanPaintPipeline(StableDiffusionPipeline):
             prompt,
             device,
             num_images_per_prompt,
-            self.do_classifier_free_guidance if self.is_turbo else False,
+            self.do_classifier_free_guidance,
             negative_prompt,
             prompt_embeds=prompt_embeds,
             negative_prompt_embeds=negative_prompt_embeds,
