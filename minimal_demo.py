@@ -18,7 +18,7 @@ from hy3dgen.rembg import BackgroundRemover
 from hy3dgen.shapegen import Hunyuan3DDiTFlowMatchingPipeline
 from hy3dgen.texgen import Hunyuan3DPaintPipeline
 
-model_path = 'tencent/Hunyuan3D-2'
+model_path = './Hunyuan3D-2'  # Changed to local path
 pipeline_shapegen = Hunyuan3DDiTFlowMatchingPipeline.from_pretrained(model_path)
 pipeline_texgen = Hunyuan3DPaintPipeline.from_pretrained(model_path)
 

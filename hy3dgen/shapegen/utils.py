@@ -93,30 +93,55 @@ def smart_load_model(
     variant,
 ):
     original_model_path = model_path
-    # try local path
-    base_dir = os.environ.get('HY3DGEN_MODELS', '~/.cache/hy3dgen')
-    model_path = os.path.expanduser(os.path.join(base_dir, model_path, subfolder))
-    logger.info(f'Try to load model from local path: {model_path}')
-    if not os.path.exists(model_path):
-        logger.info('Model path not exists, try to download from huggingface')
+    resolved_model_path = None
+
+    # 1. Try direct local path: <model_path>/<subfolder>
+    potential_local_path = os.path.join(original_model_path, subfolder)
+    if os.path.isdir(potential_local_path):
+        logger.info(f'Found model at local path: {potential_local_path}')
+        resolved_model_path = potential_local_path
+
+    if resolved_model_path is None:
+        # 2. Try cache path: ~/.cache/hy3dgen/<model_path>/<subfolder>
+        base_dir = os.environ.get('HY3DGEN_MODELS', '~/.cache/hy3dgen')
+        cache_path = os.path.expanduser(os.path.join(base_dir, original_model_path, subfolder))
+        logger.info(f'Trying to load model from cache path: {cache_path}')
+        if os.path.isdir(cache_path):
+            logger.info(f'Found model at cache path: {cache_path}')
+            resolved_model_path = cache_path
+
+    if resolved_model_path is None:
+        # 3. Try to download from Hugging Face Hub
+        logger.info(f'Model not found locally or in cache, trying to download from Hugging Face Hub: {original_model_path}')
         try:
             from huggingface_hub import snapshot_download
-            # 只下载指定子目录
-            path = snapshot_download(
+            # Download only the specified subfolder
+            hub_path = snapshot_download(
                 repo_id=original_model_path,
-                allow_patterns=[f"{subfolder}/*"],  # 关键修改：模式匹配子文件夹
+                allow_patterns=[f"{subfolder}/*"],
             )
-            model_path = os.path.join(path, subfolder)  # 保持路径拼接逻辑不变
+            # The path returned by snapshot_download is the root of the downloaded repo,
+            # so we need to append the subfolder.
+            resolved_model_path = os.path.join(hub_path, subfolder)
+            logger.info(f'Successfully downloaded model to: {resolved_model_path}')
         except ImportError:
             logger.warning(
-                "You need to install HuggingFace Hub to load models from the hub."
+                "You need to install HuggingFace Hub to load models from the hub. "
+                "Skipping download attempt."
             )
-            raise RuntimeError(f"Model path {model_path} not found")
         except Exception as e:
-            raise e
+            logger.error(f"Error downloading model from Hugging Face Hub: {e}")
+            # We don't raise here, as we want to check one last time if the path exists after all attempts.
 
-    if not os.path.exists(model_path):
-        raise FileNotFoundError(f"Model path {original_model_path} not found")
+    if resolved_model_path is None or not os.path.isdir(resolved_model_path):
+        raise FileNotFoundError(
+            f"Model not found. Attempted paths:\n"
+            f"  - Direct: {potential_local_path}\n"
+            f"  - Cache: {cache_path if 'cache_path' in locals() else 'Not attempted'}\n"
+            f"  - Hugging Face Hub download for: {original_model_path}/{subfolder}"
+        )
+
+    model_path = resolved_model_path
 
     extension = 'ckpt' if not use_safetensors else 'safetensors'
     variant = '' if variant is None else f'.{variant}'
