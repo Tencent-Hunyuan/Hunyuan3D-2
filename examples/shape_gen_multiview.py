@@ -13,7 +13,9 @@ images = {
 }
 
 for key in images:
-    image = Image.open(images[key]).convert("RGBA")
+    image = Image.open(images[key])
+    if image.mode not in ['RGB', 'RGBA']:
+        image = image.convert('RGB')
     if image.mode == 'RGB':
         rembg = BackgroundRemover()
         image = rembg(image)
