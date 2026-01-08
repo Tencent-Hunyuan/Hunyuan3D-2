@@ -110,6 +110,13 @@ def build_model_viewer_html(save_folder, height=660, width=790, textured=False):
         related_path = f"./white_mesh.glb"
         template_name = './assets/modelviewer-template.html'
         output_html_path = os.path.join(save_folder, f'white_mesh.html')
+
+    # Normalize and ensure the output path stays within the designated save directory
+    base_dir = os.path.abspath(SAVE_DIR)
+    output_html_path = os.path.abspath(output_html_path)
+    if os.path.commonpath([base_dir, output_html_path]) != base_dir:
+        raise ValueError("Invalid save folder: path traversal detected")
+
     offset = 50 if textured else 10
     with open(os.path.join(CURRENT_DIR, template_name), 'r', encoding='utf-8') as f:
         template_html = f.read()
