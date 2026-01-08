@@ -286,13 +286,23 @@ async def generate(request: Request):
 
 @app.get("/status/{uid}")
 async def status(uid: str):
-    save_file_path = os.path.join(SAVE_DIR, f'{uid}.glb')
+    # Construct path under SAVE_DIR and normalize to prevent directory traversal
+    base_dir = os.path.abspath(SAVE_DIR)
+    requested_path = os.path.join(base_dir, f'{uid}.glb')
+    save_file_path = os.path.normpath(requested_path)
+
+    # Ensure the normalized path is still within the intended base directory
+    if not save_file_path.startswith(base_dir + os.sep) and save_file_path != base_dir:
+        response = {'status': 'error', 'message': 'invalid uid'}
+        return JSONResponse(response, status_code=400)
+
     print(save_file_path, os.path.exists(save_file_path))
     if not os.path.exists(save_file_path):
         response = {'status': 'processing'}
         return JSONResponse(response, status_code=200)
     else:
-        base64_str = base64.b64encode(open(save_file_path, 'rb').read()).decode()
+        with open(save_file_path, 'rb') as f:
+            base64_str = base64.b64encode(f.read()).decode()
         response = {'status': 'completed', 'model_base64': base64_str}
         return JSONResponse(response, status_code=200)
 
