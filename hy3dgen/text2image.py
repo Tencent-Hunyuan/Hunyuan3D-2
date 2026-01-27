@@ -1,7 +1,7 @@
 # Hunyuan 3D is licensed under the TENCENT HUNYUAN NON-COMMERCIAL LICENSE AGREEMENT
 # except for the third-party components listed below.
 # Hunyuan 3D does not impose any additional limitations beyond what is outlined
-# in the repsective licenses of these third-party components.
+# in the respective licenses of these third-party components.
 # Users must comply with all terms and conditions of original licenses of these third-party
 # components and must ensure that the usage of the third party components adheres to
 # all relevant laws and regulations.
