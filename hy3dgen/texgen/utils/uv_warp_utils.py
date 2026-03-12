@@ -20,6 +20,10 @@ def mesh_uv_wrap(mesh):
     if isinstance(mesh, trimesh.Scene):
         mesh = mesh.dump(concatenate=True)
 
+    # Optimization: Decimate extremely dense meshes to prevent xatlas hang
+    if len(mesh.faces) > 100000:
+        mesh = mesh.simplify_quadric_decimation(face_count=80000)
+
     if len(mesh.faces) > 500000000:
         raise ValueError("The mesh has more than 500,000,000 faces, which is not supported.")
 

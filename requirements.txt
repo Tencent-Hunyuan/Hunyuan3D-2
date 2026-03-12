@@ -21,6 +21,7 @@ trimesh
 pymeshlab
 pygltflib
 xatlas
+fast-simplification
 #kornia
 #facexlib
 
