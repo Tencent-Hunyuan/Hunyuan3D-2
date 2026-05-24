@@ -81,7 +81,7 @@ process of 3D assets. It allows both professional and amateur users to manipulat
 efficiently.
 We systematically evaluate our models, showing that Hunyuan3D 2.0 outperforms previous state-of-the-art models,
 including the open-source models and closed-source models in geometry details, condition alignment, texture quality, and
-e.t.c.
+etc.
 
 
 
@@ -249,7 +249,7 @@ python3 gradio_app.py --model_path tencent/Hunyuan3D-2 --subfolder hunyuan3d-dit
 ### API Server
 
 You could launch an API server locally, which you could post web request for Image/Text to 3D, Texturing existing mesh,
-and e.t.c.
+and etc.
 
 ```bash
 python api_server.py --host 0.0.0.0 --port 8080
