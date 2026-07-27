@@ -149,8 +149,10 @@ class ModelWorker:
                  tex_model_path='tencent/Hunyuan3D-2',
                  subfolder='hunyuan3d-dit-v2-mini-turbo',
                  device='cuda',
-                 enable_tex=False):
+                 enable_tex=False,
+                 mv_mode=False):
         self.model_path = model_path
+        self.mv_mode = mv_mode
         self.worker_id = worker_id
         self.device = device
         logger.info(f"Loading the model {model_path} on worker {worker_id} ...")
@@ -185,9 +187,26 @@ class ModelWorker:
 
     @torch.inference_mode()
     def generate(self, uid, params):
-        if 'image' in params:
-            image = params["image"]
-            image = load_image_from_base64(image)
+        image = None
+        images_dict = {}
+
+        # Collect multi-view images
+        view_map = {
+            'image': 'front',
+            'image_front': 'front',
+            'image_left': 'left',
+            'image_back': 'back',
+            'image_right': 'right',
+        }
+        for param_key, view_name in view_map.items():
+            if param_key in params:
+                images_dict[view_name] = load_image_from_base64(params[param_key])
+
+        if images_dict:
+            if len(images_dict) == 1 and 'front' in images_dict:
+                image = images_dict['front']
+            else:
+                image = images_dict
         else:
             if 'text' in params:
                 text = params["text"]
@@ -195,7 +214,10 @@ class ModelWorker:
             else:
                 raise ValueError("No input image or text provided")
 
-        image = self.rembg(image)
+        if isinstance(image, dict):
+            image = {k: self.rembg(v) for k, v in image.items()}
+        else:
+            image = self.rembg(image)
         params['image'] = image
 
         if 'mesh' in params:
@@ -216,7 +238,11 @@ class ModelWorker:
             mesh = FloaterRemover()(mesh)
             mesh = DegenerateFaceRemover()(mesh)
             mesh = FaceReducer()(mesh, max_facenum=params.get('face_count', 40000))
-            mesh = self.pipeline_tex(mesh, image)
+            if isinstance(image, dict):
+                tex_images = list(image.values())
+            else:
+                tex_images = image
+            mesh = self.pipeline_tex(mesh, tex_images)
 
         type = params.get('type', 'glb')
         with tempfile.NamedTemporaryFile(suffix=f'.{type}', delete=False) as temp_file:
@@ -306,11 +332,30 @@ if __name__ == "__main__":
     parser.add_argument("--device", type=str, default="cuda")
     parser.add_argument("--limit-model-concurrency", type=int, default=5)
     parser.add_argument('--enable_tex', action='store_true')
+    parser.add_argument('--mv', action='store_true', help='Use multi-view model (Hunyuan3D-2mv)')
+    parser.add_argument('--subfolder', type=str, default=None, help='Model subfolder override')
     args = parser.parse_args()
     logger.info(f"args: {args}")
 
     model_semaphore = asyncio.Semaphore(args.limit_model_concurrency)
 
-    worker = ModelWorker(model_path=args.model_path, device=args.device, enable_tex=args.enable_tex,
-                         tex_model_path=args.tex_model_path)
+    mv_mode = args.mv
+    model_path = args.model_path
+    subfolder = args.subfolder
+    if mv_mode:
+        if model_path == 'tencent/Hunyuan3D-2mini':
+            model_path = 'tencent/Hunyuan3D-2mv'
+        if subfolder is None:
+            subfolder = 'hunyuan3d-dit-v2-mv'
+    elif subfolder is None:
+        subfolder = 'hunyuan3d-dit-v2-mini-turbo'
+
+    worker = ModelWorker(
+        model_path=model_path,
+        subfolder=subfolder,
+        device=args.device,
+        enable_tex=args.enable_tex,
+        tex_model_path=args.tex_model_path,
+        mv_mode=mv_mode,
+    )
     uvicorn.run(app, host=args.host, port=args.port, log_level="info")
