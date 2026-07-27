@@ -40,7 +40,7 @@ class Hunyuan3DProperties(bpy.types.PropertyGroup):
     api_url: StringProperty(
         name="API URL",
         description="URL of the Text-to-3D API service",
-        default="http://localhost:8080"
+        default="http://localhost:8081"
     )
     is_processing: BoolProperty(
         name="Processing",
@@ -56,8 +56,23 @@ class Hunyuan3DProperties(bpy.types.PropertyGroup):
     )
     # 添加图片路径属性
     image_path: StringProperty(
-        name="Image",
-        description="Select an image to upload",
+        name="Front View",
+        description="Select the front view image",
+        subtype='FILE_PATH'
+    )
+    image_left_path: StringProperty(
+        name="Left View",
+        description="Select the left view image",
+        subtype='FILE_PATH'
+    )
+    image_back_path: StringProperty(
+        name="Back View",
+        description="Select the back view image",
+        subtype='FILE_PATH'
+    )
+    image_right_path: StringProperty(
+        name="Right View",
+        description="Select the right view image",
         subtype='FILE_PATH'
     )
     # 修改后的 octree_resolution 属性
@@ -99,6 +114,9 @@ class Hunyuan3DOperator(bpy.types.Operator):
     prompt = ""
     api_url = ""
     image_path = ""
+    image_left_path = ""
+    image_back_path = ""
+    image_right_path = ""
     octree_resolution = 256
     num_inference_steps = 20
     guidance_scale = 5.5
@@ -127,6 +145,9 @@ class Hunyuan3DOperator(bpy.types.Operator):
         self.prompt = props.prompt
         self.api_url = props.api_url
         self.image_path = props.image_path
+        self.image_left_path = props.image_left_path
+        self.image_back_path = props.image_back_path
+        self.image_right_path = props.image_right_path
         self.octree_resolution = props.octree_resolution
         self.num_inference_steps = props.num_inference_steps
         self.guidance_scale = props.guidance_scale
@@ -193,16 +214,27 @@ class Hunyuan3DOperator(bpy.types.Operator):
                         image_data = file.read()
                     # 对图片数据进行 Base64 编码
                     img_b64_str = base64.b64encode(image_data).decode()
+                    payload = {
+                        "mesh": self.selected_mesh_base64,
+                        "image": img_b64_str,
+                        "octree_resolution": self.octree_resolution,
+                        "num_inference_steps": self.num_inference_steps,
+                        "guidance_scale": self.guidance_scale,
+                        "texture": self.texture
+                    }
+                    extra_views = [
+                        ('image_left_path', 'image_left'),
+                        ('image_back_path', 'image_back'),
+                        ('image_right_path', 'image_right'),
+                    ]
+                    for attr, key in extra_views:
+                        path = getattr(self, attr, '')
+                        if path and os.path.exists(path):
+                            with open(path, "rb") as f:
+                                payload[key] = base64.b64encode(f.read()).decode()
                     response = requests.post(
                         f"{base_url}/generate",
-                        json={
-                            "mesh": self.selected_mesh_base64,
-                            "image": img_b64_str,
-                            "octree_resolution": self.octree_resolution,
-                            "num_inference_steps": self.num_inference_steps,
-                            "guidance_scale": self.guidance_scale,
-                            "texture": self.texture  # 传递 texture 参数
-                        },
+                        json=payload,
                     )
                 else:
                     self.report({'INFO'}, f"Post Texturing with Text")
@@ -229,15 +261,26 @@ class Hunyuan3DOperator(bpy.types.Operator):
                         image_data = file.read()
                     # 对图片数据进行 Base64 编码
                     img_b64_str = base64.b64encode(image_data).decode()
+                    payload = {
+                        "image": img_b64_str,
+                        "octree_resolution": self.octree_resolution,
+                        "num_inference_steps": self.num_inference_steps,
+                        "guidance_scale": self.guidance_scale,
+                        "texture": self.texture
+                    }
+                    extra_views = [
+                        ('image_left_path', 'image_left'),
+                        ('image_back_path', 'image_back'),
+                        ('image_right_path', 'image_right'),
+                    ]
+                    for attr, key in extra_views:
+                        path = getattr(self, attr, '')
+                        if path and os.path.exists(path):
+                            with open(path, "rb") as f:
+                                payload[key] = base64.b64encode(f.read()).decode()
                     response = requests.post(
                         f"{base_url}/generate",
-                        json={
-                            "image": img_b64_str,
-                            "octree_resolution": self.octree_resolution,
-                            "num_inference_steps": self.num_inference_steps,
-                            "guidance_scale": self.guidance_scale,
-                            "texture": self.texture  # 传递 texture 参数
-                        },
+                        json=payload,
                     )
                 else:
                     self.report({'INFO'}, f"Post Start Text to 3D")
@@ -310,6 +353,9 @@ class Hunyuan3DPanel(bpy.types.Panel):
         layout.prop(props, "prompt")
         # 添加图片选择器
         layout.prop(props, "image_path")
+        layout.prop(props, "image_left_path")
+        layout.prop(props, "image_back_path")
+        layout.prop(props, "image_right_path")
         # 添加新属性的 UI 元素
         layout.prop(props, "octree_resolution")
         layout.prop(props, "num_inference_steps")
