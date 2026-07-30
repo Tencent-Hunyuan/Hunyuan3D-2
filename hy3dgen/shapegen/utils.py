@@ -94,8 +94,8 @@ def smart_load_model(
 ):
     original_model_path = model_path
     # try local path
-    base_dir = os.environ.get('HY3DGEN_MODELS', '~/.cache/hy3dgen')
-    model_path = os.path.expanduser(os.path.join(base_dir, model_path, subfolder))
+    base_dir = os.path.expanduser(os.environ.get('HY3DGEN_MODELS', '~/.cache/hy3dgen'))
+    model_path = os.path.normpath(os.path.join(base_dir, model_path, subfolder))
     logger.info(f'Try to load model from local path: {model_path}')
     if not os.path.exists(model_path):
         logger.info('Model path not exists, try to download from huggingface')
