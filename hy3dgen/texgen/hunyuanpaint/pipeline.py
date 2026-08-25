@@ -595,7 +595,7 @@ class HunyuanPaintPipeline(StableDiffusionPipeline):
         if self.is_turbo:
             bsz = 3
             N_gen = 15
-            index = torch.range(29, 0, -bsz, device='cuda').long()
+            index = torch.arange(29, -1, -bsz, device='cuda').long()
             timesteps = self.solver.ddim_timesteps[index]
             self.scheduler.set_timesteps(timesteps=timesteps.cpu(), device='cuda')
         else:
