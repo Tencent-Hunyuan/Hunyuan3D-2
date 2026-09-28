@@ -207,7 +207,7 @@ class Hunyuan3DDiTPipeline:
         variant='fp16',
         subfolder='hunyuan3d-dit-v2-0',
         **kwargs,
-    ):
+    ) -> "Hunyuan3DDiTFlowMatchingPipeline":
         kwargs['from_pretrained_kwargs'] = dict(
             model_path=model_path,
             subfolder=subfolder,
