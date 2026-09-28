@@ -580,6 +580,11 @@ class HunyuanPaintPipeline(StableDiffusionPipeline):
         # Here we concatenate the unconditional and text embeddings into a single batch
         # to avoid doing two forward passes
         if (self.do_classifier_free_guidance) and (not self.is_turbo):
+            # encode_prompt only relocates the negative embeds when it is told CFG is on, which
+            # this branch never is. Under model cpu offload they stay on the cpu while
+            # prompt_embeds is already on the execution device, so align them before the cat.
+            negative_prompt_embeds = negative_prompt_embeds.to(
+                device=prompt_embeds.device, dtype=prompt_embeds.dtype)
             prompt_embeds = torch.cat([negative_prompt_embeds, prompt_embeds])
 
         if ip_adapter_image is not None or ip_adapter_image_embeds is not None:
