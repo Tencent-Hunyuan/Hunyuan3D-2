@@ -13,6 +13,7 @@
 # by Tencent in accordance with TENCENT HUNYUAN COMMUNITY LICENSE AGREEMENT.
 
 import copy
+import itertools
 import importlib
 import inspect
 import os
@@ -117,6 +118,36 @@ def get_obj_from_str(string, reload=False):
     return getattr(importlib.import_module(module, package=None), cls)
 
 
+def build_from_checkpoint(config, state_dict, strict=True):
+    """Instantiate a component and adopt its checkpoint tensors without random init.
+
+    Constructing these modules normally initialises every parameter - kaiming on a 1.1B
+    parameter DINOv2 conditioner costs ~17s - and `load_state_dict` then overwrites all of
+    it. Building on the meta device allocates no storage, and `assign=True` adopts the
+    checkpoint tensors directly.
+
+    Any tensor the checkpoint does not cover would be left on meta and fail at the first
+    forward, so if that happens we fall back to ordinary construction.
+    """
+    try:
+        with torch.device('meta'):
+            module = instantiate_from_config(config)
+        module.load_state_dict(state_dict, strict=False, assign=True)
+        leftover = any(
+            tensor.is_meta
+            for tensor in itertools.chain(module.parameters(), module.buffers())
+        )
+        if not leftover:
+            return module
+        logger.debug('checkpoint does not cover every tensor, falling back to full init')
+    except Exception as error:  # meta construction is best-effort
+        logger.debug('meta construction unavailable (%s), falling back to full init', error)
+
+    module = instantiate_from_config(config)
+    module.load_state_dict(state_dict, strict=strict)
+    return module
+
+
 def instantiate_from_config(config, **kwargs):
     if "target" not in config:
         raise KeyError("Expected key `target` to instantiate.")
@@ -172,13 +203,12 @@ class Hunyuan3DDiTPipeline:
         else:
             ckpt = torch.load(ckpt_path, map_location='cpu', weights_only=True)
         # load model
-        model = instantiate_from_config(config['model'])
-        model.load_state_dict(ckpt['model'])
-        vae = instantiate_from_config(config['vae'])
-        vae.load_state_dict(ckpt['vae'], strict=False)
-        conditioner = instantiate_from_config(config['conditioner'])
+        model = build_from_checkpoint(config['model'], ckpt['model'])
+        vae = build_from_checkpoint(config['vae'], ckpt['vae'], strict=False)
         if 'conditioner' in ckpt:
-            conditioner.load_state_dict(ckpt['conditioner'])
+            conditioner = build_from_checkpoint(config['conditioner'], ckpt['conditioner'])
+        else:
+            conditioner = instantiate_from_config(config['conditioner'])
         image_processor = instantiate_from_config(config['image_processor'])
         scheduler = instantiate_from_config(config['scheduler'])
 
