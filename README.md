@@ -278,6 +278,20 @@ https://github.com/user-attachments/assets/8230bfb5-32b1-4e48-91f4-a977c54a4f3e
 
 Don't forget to visit [Hunyuan3D](https://3d.hunyuan.tencent.com) for quick use, if you don't want to host yourself.
 
+### Running shape generation on AMD GPUs (ROCm)
+
+I use the shape pipeline on a Radeon RX 6700 XT (12 GB) and hit two problems that are not AMD specific but show up there first:
+
+- **Newer `transformers` renamed the DINOv2 weights** (`attention.attention.query` became `attention.q_proj`, the SwiGLU `weights_in` became `gate_proj` + `up_proj`), so loading `hunyuan3d-dit-v2-mini-turbo` failed with missing and unexpected keys. `pipelines.py` now renames the old checkpoint keys when, and only when, the installed model expects the new names.
+- **Attention ran out of memory.** On consumer AMD cards PyTorch has no flash or memory-efficient attention, so the plain math path builds the whole score matrix at once (over 4 GB at the first denoising step). `hunyuan3ddit.py` now runs that attention a few heads at a time when the matrix is large. The result is identical; the peak drops by about 8x.
+
+Tested on: RX 6700 XT 12 GB (gfx1031, `HSA_OVERRIDE_GFX_VERSION=10.3.0`), Nobara 44 (Fedora based), ROCm 7.1, PyTorch 2.10 for ROCm, transformers 5.x. Shape only; the texture painter still needs its CUDA rasterizer.
+
+```bash
+export HSA_OVERRIDE_GFX_VERSION=10.3.0   # gfx1031 cards like the 6700 XT / 6750 XT
+python minimal_demo.py                     # shape part; mini-turbo took about 9 minutes at octree 380
+```
+
 ## 📑 Open-Source Plan
 
 - [x] Inference Code

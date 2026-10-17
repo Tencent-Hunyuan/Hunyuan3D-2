@@ -132,6 +132,23 @@ def instantiate_from_config(config, **kwargs):
     return instance
 
 
+
+def _remap_dinov2_keys(sd, target):
+    """New transformers renamed Dinov2 weights (attention.attention.query -> attention.q_proj, SwiGLU weights_in ->
+    gate_proj/up_proj, weights_out -> down_proj). Rename old checkpoint keys only when the model expects the new names."""
+    if any('attention.attention.query' in k for k in target) or not any('attention.attention.query' in k for k in sd):
+        return sd
+    out = {}
+    for k, v in sd.items():
+        n = (k.replace('attention.attention.query', 'attention.q_proj').replace('attention.attention.key', 'attention.k_proj')
+              .replace('attention.attention.value', 'attention.v_proj').replace('attention.output.dense', 'attention.o_proj'))
+        if '.mlp.weights_in.' in n:
+            gate, up = v.chunk(2, dim=0)    # old SwiGLU: x1, x2 = weights_in(x).chunk(2); silu(x1) * x2
+            out[n.replace('weights_in', 'gate_proj')] = gate; out[n.replace('weights_in', 'up_proj')] = up
+            continue
+        out[n.replace('.mlp.weights_out.', '.mlp.down_proj.')] = v
+    return out
+
 class Hunyuan3DDiTPipeline:
     model_cpu_offload_seq = "conditioner->model->vae"
     _exclude_from_cpu_offload = []
@@ -178,7 +195,7 @@ class Hunyuan3DDiTPipeline:
         vae.load_state_dict(ckpt['vae'], strict=False)
         conditioner = instantiate_from_config(config['conditioner'])
         if 'conditioner' in ckpt:
-            conditioner.load_state_dict(ckpt['conditioner'])
+            conditioner.load_state_dict(_remap_dinov2_keys(ckpt['conditioner'], conditioner.state_dict()))
         image_processor = instantiate_from_config(config['image_processor'])
         scheduler = instantiate_from_config(config['scheduler'])
 

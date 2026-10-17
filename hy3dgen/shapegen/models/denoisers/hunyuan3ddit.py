@@ -31,7 +31,14 @@ if os.environ.get('USE_SAGEATTN', '0') == '1':
 
 
 def attention(q: Tensor, k: Tensor, v: Tensor, **kwargs) -> Tensor:
-    x = scaled_dot_product_attention(q, k, v)
+    # ROCm on gfx1030 has no flash/mem-efficient SDPA, so the math path materialises B*H*L*L scores (4+ GB here).
+    # Run it a few heads at a time to keep the peak small; identical result.
+    if q.is_cuda and q.shape[-2] * k.shape[-2] * q.shape[0] * q.shape[1] > 2 ** 28:
+        step = max(1, q.shape[1] // 8)
+        x = torch.cat([scaled_dot_product_attention(q[:, h:h + step], k[:, h:h + step], v[:, h:h + step])
+                       for h in range(0, q.shape[1], step)], dim=1)
+    else:
+        x = scaled_dot_product_attention(q, k, v)
     x = rearrange(x, "B H L D -> B L (H D)")
     return x
 
