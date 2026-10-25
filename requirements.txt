@@ -13,7 +13,7 @@ torchvision
 #ipdb
 omegaconf
 
-#sentencepiece
+sentencepiece   # text2image: the mT5 tokenizer is sentencepiece-only
 tqdm
 
 # Mesh Processing
