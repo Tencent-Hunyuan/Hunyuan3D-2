@@ -259,7 +259,7 @@ class HierarchicalVolumeDecoding:
                 next_index = dilate(next_index.unsqueeze(0)).squeeze(0)
             nidx = torch.where(next_index > 0)
 
-            next_points = torch.stack(nidx, dim=1)
+            next_points = torch.stack(nidx, dim=1).to(torch.float32)
             next_points = (next_points * torch.tensor(resolution, dtype=next_points.dtype, device=device) +
                            torch.tensor(bbox_min, dtype=next_points.dtype, device=device))
             batch_logits = []
